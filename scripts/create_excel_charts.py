@@ -10,12 +10,13 @@ from openpyxl.utils import get_column_letter
 
 ROOT = Path(__file__).resolve().parents[1]
 AWS_RESULTS = ROOT / "results" / "aws_ec2_multiply_benchmark.csv"
+ECE_RESULTS = ROOT / "results" / "ece_cluster_multiply_benchmark.csv"
 OUTPUT = ROOT / "results" / "large_integer_multiplication_charts.xlsx"
 
 
-def load_results():
+def load_machine_results(path):
     rows = {}
-    with AWS_RESULTS.open(newline="") as f:
+    with path.open(newline="") as f:
         for row in csv.DictReader(f):
             digits = int(row["digits"])
             rows.setdefault(digits, {})[row["method"]] = float(row["flops_per_second"])
@@ -35,7 +36,7 @@ def add_chart_sheet(wb, data_ws, title, method_column_start, sheet_name):
     ws = wb.create_sheet(sheet_name)
     ws["A1"] = title
     ws["A1"].font = Font(size=16, bold=True)
-    ws["A3"] = "ECE Cluster data is intentionally blank until that run is available."
+    ws["A3"] = "Clustered columns compare ECE Cluster and AWS EC2 for each input length."
     ws["A3"].font = Font(italic=True, color="666666")
 
     chart = BarChart()
@@ -67,7 +68,9 @@ def add_chart_sheet(wb, data_ws, title, method_column_start, sheet_name):
 
 
 def main():
-    results = load_results()
+    aws_results = load_machine_results(AWS_RESULTS)
+    ece_results = load_machine_results(ECE_RESULTS)
+    all_digits = sorted(set(aws_results) | set(ece_results))
 
     wb = Workbook()
     data_ws = wb.active
@@ -80,13 +83,13 @@ def main():
         "AWS EC2 O(n log2 n) flops/s",
     ])
 
-    for digits in sorted(results):
+    for digits in all_digits:
         data_ws.append([
             digits,
-            None,
-            results[digits].get("quadratic"),
-            None,
-            results[digits].get("fft"),
+            ece_results.get(digits, {}).get("quadratic"),
+            aws_results.get(digits, {}).get("quadratic"),
+            ece_results.get(digits, {}).get("fft"),
+            aws_results.get(digits, {}).get("fft"),
         ])
 
     style_header(data_ws)
@@ -100,8 +103,8 @@ def main():
     data_ws["G1"] = "How to use"
     data_ws["G1"].fill = PatternFill("solid", fgColor="D9EAF7")
     data_ws["G1"].font = Font(bold=True)
-    data_ws["G2"] = "Paste ECE flops/s values into columns B and D."
-    data_ws["G3"] = "The two chart sheets update automatically in Excel."
+    data_ws["G2"] = "Source files: aws_ec2_multiply_benchmark.csv and ece_cluster_multiply_benchmark.csv."
+    data_ws["G3"] = "Each chart contains ECE Cluster and AWS EC2 clustered columns."
     data_ws.column_dimensions["G"].width = 56
 
     add_chart_sheet(wb, data_ws, "O(n^2) Multiplication: flops/s vs Problem Size", 2, "O(n^2) Chart")

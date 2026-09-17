@@ -1,3 +1,4 @@
 build/
 results/local_*
 *.tar.gz
+~$*.xlsx
